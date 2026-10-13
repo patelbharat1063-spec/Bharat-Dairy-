@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bharat Dairy — Cloud Records</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --navy: #123747;
+  --green: #176b45;
+  --gold: #ffd166;
+  --bg: #f3f7f5;
+  --border: #d9e4df;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: #20332c;
+}
+header {
+  background: var(--navy);
+  color: white;
+  padding: 22px 16px;
+  text-align: center;
+}
+header h1 { margin: 0 0 7px; }
+header p { margin: 0; color: #e1eeee; }
+main {
+  max-width: 950px;
+  margin: 20px auto;
+  padding: 0 12px 30px;
+}
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 17px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px #1237470b;
+}
+h2 { margin-top: 0; color: var(--navy); }
+label {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+input, select, textarea, button {
+  font: inherit;
+  width: 100%;
+  padding: 11px;
+  border-radius: 7px;
+}
+input, select, textarea {
+  border: 1px solid #bdcdc5;
+  background: white;
+}
+textarea { min-height: 95px; resize: vertical; }
+button {
+  border: 0;
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+}
+button.secondary { background: var(--navy); }
+button.danger { background: #a83232; }
+button.light { background: #e6eee9; color: #183e30; }
+button:disabled { opacity: .55; cursor: wait; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.actions button { flex: 1; min-width: 110px; }
+.record {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 13px;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.record h3 { margin: 0 0 8px; }
+.meta { color: #5c6f66; font-size: 13px; }
+.details {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+#status {
+  padding: 10px;
+  border-radius: 7px;
+  background: #e8f2ed;
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+#status.error { background: #ffeded; color: #8b1e1e; }
+.hidden { display: none !important; }
+.small { font-size: 13px; color: #586b62; }
+footer { text-align: center; padding: 12px; color: #66776e; }
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+  main { margin-top: 12px; }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>🐄 Bharat Dairy</h1>
+  <p>Secure Cloud Records · Farmers · Animals · Milk · Breeding · Sonography</p>
+</header>
+
+<main>
+  <div id="status" role="status">Connecting to Supabase…</div>
+
+  <section class="card" id="loginCard">
+    <h2>🔐 Account Login</h2>
+    <p class="small">Sign in with your existing Supabase account.</p>
+
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+
+      <label for="password">Password</label>
+      <input id="password" type="password"
+             autocomplete="current-password" required>
+
+      <div class="actions">
+        <button type="submit">Sign In</button>
+        <button type="button" class="secondary" id="signupBtn">
+          Create Account
+        </button>
+      </div>
+      <button type="button" class="light" id="resetBtn">
+        Send Password Reset Email
+      </button>
+    </form>
+    <p class="small">
+      If email confirmation is enabled, confirm your email before signing in.
+    </p>
+  </section>
+
+  <section class="card hidden" id="appCard">
+    <div class="actions">
+      <div style="flex:2;min-width:180px">
+        <strong>Signed in as:</strong>
+        <div id="userEmail" class="small"></div>
+      </div>
+      <button type="button" class="danger" id="logoutBtn">Sign Out</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="formCard">
+    <h2 id="formHeading">➕ Add Record</h2>
+    <form id="recordForm">
+      <input type="hidden" id="recordId">
+
+      <div class="grid">
+        <div>
+          <label for="category">Record Category</label>
+          <select id="category" required>
+            <option value="farmers">Farmers</option>
+            <option value="animals">Animals</option>
+            <option value="milk">Milk Records</option>
+            <option value="breeding">Breeding</option>
+            <option value="sonography">Sonography</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="recordName">Name / Record ID</label>
+          <input id="recordName" required maxlength="200"
+                 placeholder="e.g. Farmer Bharat or GJ-COW-024">
+        </div>
+
+        <div>
+          <label for="recordDate">Record Date</label>
+          <input id="recordDate" type="date">
+        </div>
+      </div>
+
+      <label for="recordDetails">Details</label>
+      <textarea id="recordDetails"
+        placeholder="Farmer: phone, village, address&#10;Animal: breed, sex, DOB, tag number&#10;Milk: litres, morning/evening, fat&#10;Breeding: heat, AI date, bull, PD result&#10;Sonography: examination date, findings, result"></textarea>
+
+      <label for="recordNotes">Notes</label>
+      <textarea id="recordNotes" placeholder="Additional notes, follow-up or reminders"></textarea>
+
+      <div class="actions">
+        <button type="submit" id="saveBtn">Save Record</button>
+        <button type="button" class="light" id="clearBtn">Clear Form</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card hidden" id="recordsCard">
+    <h2>📋 Saved Cloud Records</h2>
+
+    <div class="grid">
+      <div>
+        <label for="filterCategory">Filter Category</label>
+        <select id="filterCategory">
+          <option value="all">All Categories</option>
+          <option value="farmers">Farmers</option>
+          <option value="animals">Animals</option>
+          <option value="milk">Milk Records</option>
+          <option value="breeding">Breeding</option>
+          <option value="sonography">Sonography</option>
+        </select>
+      </div>
+      <div>
+        <label for="searchBox">Search</label>
+        <input id="searchBox" placeholder="Search name or details">
+      </div>
+    </div>
+
+    <button type="button" class="secondary" id="refreshBtn">
+      Refresh Cloud Records
+    </button>
+    <p id="recordCount" class="small"></p>
+    <div id="recordsList"></div>
+  </section>
+</main>
+
+<footer>Bharat Dairy · Supabase Cloud Storage</footer>
+
+<script>
+"use strict";
+
+/* Your Supabase project configuration */
+const SUPABASE_URL = "https://geqqdroiybkaucpuajfo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_OfvIta_9u1d37UXiDyPHmw_xrtBSDvC";
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const $ = id => document.getElementById(id);
+
+let currentUser = null;
+let records = [];
+let busy = false;
+
+function status(message, error = false) {
+  $("status").textContent = message;
+  $("status").classList.toggle("error", error);
+}
+
+function friendlyError(error) {
+  return error?.message || "An unexpected error occurred.";
+}
+
+function setSignedIn(user) {
+  currentUser = user || null;
+  $("loginCard").classList.toggle("hidden", !!currentUser);
+  $("appCard").classList.toggle("hidden", !currentUser);
+  $("formCard").classList.toggle("hidden", !currentUser);
+  $("recordsCard").classList.toggle("hidden", !currentUser);
+  $("userEmail").textContent = currentUser?.email || "";
+  if (!currentUser) {
+    records = [];
+    renderRecords();
+    clearForm();
+  }
+}
+
+function clearForm() {
+  $("recordForm").reset();
+  $("recordId").value = "";
+  $("recordDate").value = new Date().toISOString().slice(0, 10);
+  $("formHeading").textContent = "➕ Add Record";
+  $("saveBtn").textContent = "Save Record";
+}
+
+async function loadRecords() {
+  if (!currentUser) return;
+
+  status("Loading your cloud records…");
+  $("refreshBtn").disabled = true;
+
+  try {
+    const { data, error } = await db
+      .from("animal_records")
+      .select("id,user_id,record_type,record_data,created_at,updated_at")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    records = data || [];
+    renderRecords();
+    status("Cloud records loaded successfully.");
+  } catch (error) {
+    status("Could not load records: " + friendlyError(error), true);
+  } finally {
+    $("refreshBtn").disabled = false;
+  }
+}
+
+function renderRecords() {
+  const list = $("recordsList");
+  list.replaceChildren();
+
+  const category = $("filterCategory").value;
+  const search = $("searchBox").value.trim().toLowerCase();
+
+  const filtered = records.filter(row => {
+    if (category !== "all" && row.record_type !== category) return false;
+    const d = row.record_data || {};
+    const searchable = [
+      row.record_type, d.name, d.date, d.details, d.notes
+    ].join(" ").toLowerCase();
+    return searchable.includes(search);
+  });
+
+  $("recordCount").textContent =
+    filtered.length + " record(s) shown · " +
+    records.length + " total in your account";
+
+  if (!filtered.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No matching records. Add a record above.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const row of filtered) {
+    const d = row.record_data || {};
+    const card = document.createElement("article");
+    card.className = "record";
+
+    const title = document.createElement("h3");
+    title.textContent = d.name || "Untitled record";
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent =
+      row.record_type.toUpperCase() +
+      (d.date ? " · " + d.date : "") +
+      " · Updated " + new Date(row.updated_at).toLocaleString();
+
+    const details = document.createElement("div");
+    details.className = "details";
+    details.textContent = d.details || "No details entered.";
+
+    card.append(title, meta, details);
+
+    if (d.notes) {
+      const notes = document.createElement("div");
+      notes.className = "details";
+      notes.textContent = "Notes: " + d.notes;
+      card.appendChild(notes);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "secondary";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => editRecord(row.id));
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "danger";
+    del.textContent = "Delete";
+    del.addEventListener("click", () => deleteRecord(row.id));
+
+    actions.append(edit, del);
+    card.appendChild(actions);
+    list.appendChild(card);
+  }
+}
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (busy) return;
+  busy = true;
+
+  try {
+    status("Signing in…");
+    const { data, error } = await db.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+    if (error) throw error;
+
+    setSignedIn(data.user);
+    await loadRecords();
+  } catch (error) {
+    status("Sign-in failed: " + friendlyError(error), true);
+  } finally {
+    busy = false;
+  }
+});
+
+$("signupBtn").addEventListener("click", async () => {
+  if (busy) return;
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || password.length < 8) {
+    status("Enter your email and a password of at least 8 characters.", true);
+    return;
+  }
+
+  busy = true;
+  try {
+    status("Creating account…");
+    const { data, error } = await db.auth.signUp({ email, password });
+    if (error) throw error;
+
+    if (data.session && data.user) {
+      setSignedIn(data.user);
+      await loadRecords();
+      status("Account created and signed in.");
+    } else {
+      status("Account request sent. Check your email to confirm, then sign in.");
+    }
+  } catch (error) {
+    status("Account creation failed: " + friendlyError(error), true);
+  } finally {
+    busy = false;
+  }
+});
+
+$("resetBtn").addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  if (!email) {
+    status("Enter your email address first.", true);
+    return;
+  }
+
+  try {
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href
+    });
+    if (error) throw error;
+    status("If the account is eligible, a password-reset email has been sent.");
+  } catch (error) {
+    status("Reset request failed: " + friendlyError(error), true);
+  }
+});
+
+$("logoutBtn").addEventListener("click", async () => {
+  const { error } = await db.auth.signOut();
+  if (error) {
+    status("Sign-out failed: " + friendlyError(error), true);
+    return;
+  }
+  setSignedIn(null);
+  status("Signed out.");
+});
+
+$("recordForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!currentUser || busy) return;
+  busy = true;
+  $("saveBtn").disabled = true;
+
+  const id = $("recordId").value;
+  const payload = {
+    record_type: $("category").value,
+    record_data: {
+      name: $("recordName").value.trim(),
+      date: $("recordDate").value,
+      details: $("recordDetails").value.trim(),
+      notes: $("recordNotes").value.trim()
+    },
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    let result;
+
+    if (id) {
+      result = await db.from("animal_records")
+        .update(payload)
+        .eq("id", id)
+        .eq("user_id", currentUser.id)
+        .select("id");
+    } else {
+      result = await db.from("animal_records")
+        .insert({
+          ...payload,
+          user_id: currentUser.id
+        })
+        .select("id");
+    }
+
+    if (result.error) throw result.error;
+
+    if (id && (!result.data || result.data.length === 0)) {
+      throw new Error("Record was not updated. Refresh and try again.");
+    }
+
+    clearForm();
+    await loadRecords();
+    status(id ? "Record updated." : "Record saved to Supabase.");
+  } catch (error) {
+    status("Save failed: " + friendlyError(error), true);
+  } finally {
+    busy = false;
+    $("saveBtn").disabled = false;
+  }
+});
+
+function editRecord(id) {
+  const row = records.find(r => r.id === id);
+  if (!row || !currentUser || row.user_id !== currentUser.id) return;
+
+  const d = row.record_data || {};
+  $("recordId").value = row.id;
+  $("category").value = row.record_type;
+  $("recordName").value = d.name || "";
+  $("recordDate").value = d.date || "";
+  $("recordDetails").value = d.details || "";
+  $("recordNotes").value = d.notes || "";
+  $("formHeading").textContent = "✏️ Edit Record";
+  $("saveBtn").textContent = "Update Record";
+  $("formCard").scrollIntoView({ behavior: "smooth" });
+}
+
+async function deleteRecord(id) {
+  if (!currentUser) return;
+
+  const row = records.find(r => r.id === id);
+  if (!row || row.user_id !== currentUser.id) return;
+
+  if (!confirm("Permanently delete this record?")) return;
+
+  try {
+    const { data, error } = await db
+      .from("animal_records")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", currentUser.id)
+      .select("id");
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("No record was deleted. Check permissions.");
+    }
+
+    await loadRecords();
+    status("Record deleted.");
+  } catch (error) {
+    status("Delete failed: " + friendlyError(error), true);
+  }
+}
+
+$("clearBtn").addEventListener("click", clearForm);
+$("refreshBtn").addEventListener("click", loadRecords);
+$("filterCategory").addEventListener("change", renderRecords);
+$("searchBox").addEventListener("input", renderRecords);
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    setSignedIn(null);
+    return;
+  }
+  if (session?.user) {
+    setSignedIn(session.user);
+    if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+      setTimeout(() => loadRecords(), 0);
+    }
+  }
+});
+
+(async function initialize() {
+  try {
+    const { data, error } = await db.auth.getSession();
+    if (error) throw error;
+
+    if (data.session?.user) {
+      setSignedIn(data.session.user);
+      await loadRecords();
+    } else {
+      setSignedIn(null);
+      status("Ready. Sign in to access your private cloud records.");
+    }
+  } catch (error) {
+    status("Connection error: " + friendlyError(error), true);
+  }
+})();
+</script>
+</body>
+</html>
