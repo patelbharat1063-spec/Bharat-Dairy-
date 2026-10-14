@@ -1,0 +1,75 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bharat Dairy Cloud Test</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial;max-width:650px;margin:20px auto;padding:14px;background:#f3f7f5;color:#20332c}
+section{background:white;padding:18px;border:1px solid #d9e4df;border-radius:12px}
+input,button{box-sizing:border-box;width:100%;padding:12px;margin:7px 0;border-radius:7px}
+input{border:1px solid #bdcdc5}button{background:#176b45;color:white;border:0;font-weight:bold}
+#status{padding:12px;background:#e8f2ed;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<h2>🐄 Bharat Dairy — Cloud Test</h2>
+<section>
+<p id="status">Sign in to test secure, read-only access.</p>
+<form id="login">
+<label>Email</label>
+<input id="email" type="email" required autocomplete="username">
+<label>Password</label>
+<input id="password" type="password" required autocomplete="current-password">
+<button type="submit">Sign In and Test</button>
+</form>
+<button id="refresh" hidden>Test Again</button>
+</section>
+<script>
+const db = window.supabase.createClient(
+  "https://geqqdroiybkaucpuajfo.supabase.co",
+  "sb_publishable_OfvIta_9u1d37UXiDyPHmw_xrtBSDvC"
+);
+const statusBox = document.getElementById("status");
+
+async function testRead() {
+  statusBox.textContent = "Checking bharat_dairy_records…";
+  const { data, error } = await db
+    .from("bharat_dairy_records")
+    .select("module,record_key,created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    statusBox.textContent = "Read failed: " + error.message;
+    return;
+  }
+
+  statusBox.textContent = data.length
+    ? "SUCCESS: Read access works. Rows visible: " + data.length +
+      ". Modules: " + [...new Set(data.map(r => r.module))].join(", ")
+    : "SUCCESS: Table is reachable, but this account has zero visible rows.";
+  document.getElementById("refresh").hidden = false;
+}
+
+document.getElementById("login").addEventListener("submit", async e => {
+  e.preventDefault();
+  statusBox.textContent = "Signing in…";
+  const { data, error } = await db.auth.signInWithPassword({
+    email: document.getElementById("email").value.trim(),
+    password: document.getElementById("password").value
+  });
+  if (error) {
+    statusBox.textContent = "Login failed: " + error.message;
+    return;
+  }
+  await testRead();
+});
+
+document.getElementById("refresh").addEventListener("click", testRead);
+</script>
+<p><a href="./index.html">Return to original Bharat Dairy app</a></p>
+</body>
+</html>
